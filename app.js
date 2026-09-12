@@ -77,7 +77,7 @@ document.getElementById("transactionForm").addEventListener("submit", async (eve
   const amount = Number(document.getElementById("amount").value);
   const method = document.getElementById("method").value;
   const description = document.getElementById("description").value.trim();
-  const { rateCharge, fixedCharge, total } = calculateCharges();
+  const { rateCharge, fixedCharge } = calculateCharges();
   const charge = rateCharge + fixedCharge;
 
   if (!personId) return alert("Select a person");
@@ -150,6 +150,9 @@ function displayPeople() {
     const balance = totals.received - totals.repaid;
     const div = document.createElement("div");
     div.className = "person";
+    div.tabIndex = 0;
+    div.setAttribute("role", "button");
+    div.setAttribute("aria-label", `Open ${people[id].name} details`);
     div.innerHTML = `
       <div>
         <div class="person-name">${escapeHtml(people[id].name)}</div>
@@ -160,6 +163,14 @@ function displayPeople() {
       </div>
       <div class="balance ${balance >= 0 ? "positive" : "negative"}">₹${formatMoney(balance)}</div>
     `;
+    const openPerson = () => { window.location.href = `person.html?id=${encodeURIComponent(id)}`; };
+    div.addEventListener("click", openPerson);
+    div.addEventListener("keydown", (event) => {
+      if (event.key === "Enter" || event.key === " ") {
+        event.preventDefault();
+        openPerson();
+      }
+    });
     container.appendChild(div);
   });
 }
