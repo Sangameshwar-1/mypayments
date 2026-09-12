@@ -6,16 +6,100 @@ let editingTransactionId = null;
 const peopleRef = ref(db, "mypayments/people");
 const transactionsRef = ref(db, "mypayments/transactions");
 
-function chargeTotal(charges = []) { return charges.reduce((sum, c) => sum + (Number(c.amount) || 0), 0); }
-function transactionTotal(t) { return (Number(t.amount) || 0) + (Array.isArray(t.charges) ? chargeTotal(t.charges) : (Number(t.charge) || 0)); }
+function chargeValue(c, baseAmount) {
+  const value = Number(c.value ?? c.amount) || 0;
+  if (c.kind === "percentage") {
+    const rate = value;
+    if (!rate) return 0;
+    if (c.included) return baseAmount - (baseAmount / (1 + rate / 100));
+    return baseAmount * rate / 100;
+  }
+  return value;
+}
+function chargeTotal(charges = [], baseAmount = 0) {
+  return charges.reduce((sum, c) => sum + chargeValue(c, baseAmount), 0);
+}
+function transactionTotal(t) {
+  const amount = Number(t.amount) || 0;
+  const charges = Array.isArray(t.charges) ? t.charges : (Number(t.charge) ? [{ amount: Number(t.charge), kind: "fixed", comment: "" }] : []);
+  return amount + chargeTotal(charges, amount);
+}
 function normalizedType(t) { return t.type === "taken" ? "credit" : t.type === "repaid" ? "debit" : (t.type || "other"); }
 function typeLabel(t) { const type = normalizedType(t); return type === "credit" ? "Credit" : type === "debit" ? "Debit" : (t.otherType || "Other"); }
 function platformLabel(t) { return t.platform || t.method || "Other"; }
-function personTotals(personId) { return Object.values(transactions).reduce((x, t) => { if (t.personId !== personId) return x; const total = transactionTotal(t); if (normalizedType(t) === "credit") x.credit += total; else if (normalizedType(t) === "debit") x.debit += total; return x; }, { credit: 0, debit: 0 }); }
-function getChargesFromForm() { return [...document.querySelectorAll("#chargesList .charge-row")].map(row => ({ amount: Number(row.querySelector(".charge-amount").value) || 0, comment: row.querySelector(".charge-comment").value.trim() })).filter(c => c.amount > 0); }
-function calculatePreview() { const amount = Number(document.getElementById("amount").value) || 0, charges = getChargesFromForm(), total = amount + chargeTotal(charges); document.getElementById("chargePreview").textContent = `Charges: ₹${formatMoney(chargeTotal(charges))} • Total: ₹${formatMoney(total)}`; document.getElementById("noCharges").style.display = charges.length ? "none" : "block"; }
-function addChargeRow(amount = "", comment = "") { const row = document.createElement("div"); row.className = "charge-row"; row.innerHTML = `<input class="charge-amount" type="number" min="0" step="0.01" value="${amount}" placeholder="Charge amount"><input class="charge-comment" type="text" value="${escapeHtml(comment)}" placeholder="Charge comment"><button type="button" class="remove-charge">×</button>`; row.querySelectorAll("input").forEach(i => i.addEventListener("input", calculatePreview)); row.querySelector(".remove-charge").addEventListener("click", () => { row.remove(); calculatePreview(); }); document.getElementById("chargesList").appendChild(row); calculatePreview(); }
-function updateConditionalFields() { const otherType = document.getElementById("transactionType").value === "other", otherPlatform = document.getElementById("platform").value === "Other"; document.getElementById("otherTypeWrap").style.display = otherType ? "block" : "none"; document.getElementById("otherPlatformWrap").style.display = otherPlatform ? "block" : "none"; if (!otherType) document.getElementById("otherType").value = ""; if (!otherPlatform) document.getElementById("otherPlatform").value = ""; }
+function personTotals(personId) {
+  return Object.values(transactions).reduce((x, t) => {
+    if (t.personId !== personId) return x;
+    const total = transactionTotal(t);
+    if (normalizedType(t) === "credit") x.credit += total;
+    else if (normalizedType(t) === "debit") x.debit += total;
+    return x;
+  }, { credit: 0, debit: 0 });
+}
+function getChargesFromForm(selector = "#chargesList") {
+  return [...document.querySelectorAll(`${selector} .charge-row`)].map(row => ({
+    kind: row.querySelector(".charge-kind").value,
+    value: Number(row.querySelector(".charge-value").value) || 0,
+    included: row.querySelector(".charge-included")?.checked || false,
+    comment: row.querySelector(".charge-comment").value.trim()
+  })).filter(c => c.value > 0);
+}
+function chargeLabel(c, baseAmount) {
+  const value = chargeValue(c, baseAmount);
+  return c.kind === "percentage" ? `${c.value}%${c.included ? " included" : ""} = ₹${formatMoney(value)}` : `₹${formatMoney(value)}`;
+}
+function calculatePreview() {
+  const amount = Number(document.getElementById("amount").value) || 0;
+  const charges = getChargesFromForm();
+  const total = amount + chargeTotal(charges, amount);
+  document.getElementById("chargePreview").textContent = `Charges: ₹${formatMoney(chargeTotal(charges, amount))} • Total: ₹${formatMoney(total)}`;
+  document.getElementById("noCharges").style.display = charges.length ? "none" : "block";
+}
+function addChargeRow(charge = {}) {
+  const row = document.createElement("div");
+  row.className = "charge-row charge-row-flex";
+  row.innerHTML = `<select class="charge-kind"><option value="fixed">Fixed amount</option><option value="percentage">Percentage</option></select><input class="charge-value" type="number" min="0" step="0.01" value="${charge.value ?? charge.amount ?? ""}" placeholder="Amount / %"><label class="included-option"><input class="charge-included" type="checkbox" ${charge.included ? "checked" : ""}> Included</label><input class="charge-comment" type="text" value="${escapeHtml(charge.comment || "")}" placeholder="Charge comment"><button type="button" class="remove-charge">×</button>`;
+  const kind = row.querySelector(".charge-kind");
+  const included = row.querySelector(".charge-included");
+  function sync() {
+    included.parentElement.style.visibility = kind.value === "percentage" ? "visible" : "hidden";
+    calculatePreview();
+  }
+  kind.value = charge.kind || (charge.rate != null ? "percentage" : "fixed");
+  row.querySelectorAll("input,select").forEach(el => el.addEventListener("input", sync));
+  row.querySelector(".remove-charge").addEventListener("click", () => { row.remove(); calculatePreview(); });
+  document.getElementById("chargesList").appendChild(row);
+  sync();
+}
+function addEditChargeRow(charge = {}) {
+  const row = document.createElement("div");
+  row.className = "charge-row charge-row-flex";
+  row.innerHTML = `<select class="edit-charge-kind"><option value="fixed">Fixed amount</option><option value="percentage">Percentage</option></select><input class="edit-charge-value" type="number" min="0" step="0.01" value="${charge.value ?? charge.amount ?? ""}" placeholder="Amount / %"><label class="included-option"><input class="edit-charge-included" type="checkbox" ${charge.included ? "checked" : ""}> Included</label><input class="edit-charge-comment" type="text" value="${escapeHtml(charge.comment || "")}" placeholder="Charge comment"><button type="button" class="remove-charge">×</button>`;
+  const kind = row.querySelector(".edit-charge-kind");
+  const included = row.querySelector(".edit-charge-included");
+  function sync() { included.parentElement.style.visibility = kind.value === "percentage" ? "visible" : "hidden"; }
+  kind.value = charge.kind || (charge.rate != null ? "percentage" : "fixed");
+  kind.addEventListener("change", sync);
+  row.querySelector(".remove-charge").addEventListener("click", () => row.remove());
+  document.getElementById("editChargesList").appendChild(row);
+  sync();
+}
+function getEditCharges() {
+  return [...document.querySelectorAll("#editChargesList .charge-row")].map(row => ({
+    kind: row.querySelector(".edit-charge-kind").value,
+    value: Number(row.querySelector(".edit-charge-value").value) || 0,
+    included: row.querySelector(".edit-charge-included")?.checked || false,
+    comment: row.querySelector(".edit-charge-comment").value.trim()
+  })).filter(c => c.value > 0);
+}
+function updateConditionalFields() {
+  const otherType = document.getElementById("transactionType").value === "other";
+  const otherPlatform = document.getElementById("platform").value === "Other";
+  document.getElementById("otherTypeWrap").style.display = otherType ? "block" : "none";
+  document.getElementById("otherPlatformWrap").style.display = otherPlatform ? "block" : "none";
+  if (!otherType) document.getElementById("otherType").value = "";
+  if (!otherPlatform) document.getElementById("otherPlatform").value = "";
+}
 function localDate() { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`; }
 function localTime() { const d = new Date(); return `${String(d.getHours()).padStart(2,"0")}:${String(d.getMinutes()).padStart(2,"0")}`; }
 function fallbackTime(t) { if (t.time) return t.time; if (t.createdAt) { const d = new Date(t.createdAt); return `${String(d.getHours()).padStart(2,"0")}:${String(d.getMinutes()).padStart(2,"0")}`; } return ""; }
@@ -23,15 +107,13 @@ function setToday() { document.getElementById("transactionDate").value = localDa
 function resetTransactionForm() { document.getElementById("transactionForm").reset(); document.getElementById("chargesList").innerHTML = ""; setToday(); updateConditionalFields(); calculatePreview(); }
 function transactionSortValue(t) { return `${t.date || "0000-00-00"}T${t.time || "00:00"}`; }
 
-window.addPerson = async function() { const input = document.getElementById("personName"), name = input.value.trim(); if (!name) return alert("Enter a name"); await set(push(peopleRef), { name, createdAt: Date.now() }); input.value = ""; };
-window.editPerson = async function(id) { const person = people[id]; if (!person) return; const name = prompt("Edit person name:", person.name || ""); if (name === null) return; const value = name.trim(); if (!value) return alert("Name cannot be empty"); await update(ref(db, `mypayments/people/${id}`), { name: value }); };
-window.deletePerson = async function(id) { const person = people[id]; if (!person) return; const hasTransactions = Object.values(transactions).some(t => t.personId === id); const message = hasTransactions ? `Delete ${person.name} and all transactions for this person?` : `Delete ${person.name}?`; if (!confirm(message)) return; if (hasTransactions && !confirm("This will permanently delete the person's transaction history. Continue?")) return; const updates = {}; updates[`mypayments/people/${id}`] = null; Object.entries(transactions).forEach(([txId, t]) => { if (t.personId === id) updates[`mypayments/transactions/${txId}`] = null; }); await update(ref(db), updates); };
-window.deleteTransaction = async id => { if (confirm("Delete this transaction permanently?")) await remove(ref(db, `mypayments/transactions/${id}`)); };
-
+window.addPerson = async function() { const input = document.getElementById("personName"), name = input.value.trim(); if (!name) return alert("Enter a name"); try { await set(push(peopleRef), { name, createdAt: Date.now() }); input.value = ""; } catch (e) { alert(`Could not add person: ${e.message}`); } };
+window.editPerson = async function(id) { const person = people[id]; if (!person) return; const name = prompt("Edit person name:", person.name || ""); if (name === null) return; const value = name.trim(); if (!value) return alert("Name cannot be empty"); try { await update(ref(db, `mypayments/people/${id}`), { name: value }); } catch (e) { alert(`Could not edit person: ${e.message}`); } };
+window.deletePerson = async function(id) { const person = people[id]; if (!person) return; const hasTransactions = Object.values(transactions).some(t => t.personId === id); const message = hasTransactions ? `Delete ${person.name} and all transactions for this person?` : `Delete ${person.name}?`; if (!confirm(message)) return; if (hasTransactions && !confirm("This will permanently delete the transaction history. Continue?")) return; const updates = {}; updates[`mypayments/people/${id}`] = null; Object.entries(transactions).forEach(([txId,t]) => { if (t.personId === id) updates[`mypayments/transactions/${txId}`] = null; }); try { await update(ref(db), updates); } catch (e) { alert(`Could not delete: ${e.message}`); } };
+window.deleteTransaction = async id => { if (!confirm("Delete this transaction permanently?")) return; try { await remove(ref(db, `mypayments/transactions/${id}`)); } catch (e) { alert(`Could not delete transaction: ${e.message}`); } };
 window.editTransaction = function(id) {
   const t = transactions[id]; if (!t) return;
   editingTransactionId = id;
-  document.getElementById("editTransactionTitle").textContent = "Edit transaction";
   document.getElementById("editPerson").innerHTML = Object.entries(people).map(([pid,p]) => `<option value="${pid}">${escapeHtml(p.name)}</option>`).join("");
   document.getElementById("editPerson").value = t.personId || "";
   document.getElementById("editDate").value = t.date || localDate();
@@ -39,30 +121,33 @@ window.editTransaction = function(id) {
   document.getElementById("editType").value = normalizedType(t);
   document.getElementById("editOtherType").value = t.otherType || "";
   const knownPlatforms = ["PhonePe","GPay","WhatsApp","Paytm","Amazon Pay","Bank Transfer","Cash"];
-  document.getElementById("editPlatform").value = knownPlatforms.includes(platformLabel(t)) ? platformLabel(t) : "Other";
-  document.getElementById("editOtherPlatform").value = knownPlatforms.includes(platformLabel(t)) ? "" : platformLabel(t);
+  const platform = platformLabel(t);
+  document.getElementById("editPlatform").value = knownPlatforms.includes(platform) ? platform : "Other";
+  document.getElementById("editOtherPlatform").value = knownPlatforms.includes(platform) ? "" : platform;
   document.getElementById("editAmount").value = t.amount ?? "";
   document.getElementById("editAmountComment").value = t.amountComment || "";
   document.getElementById("editPurpose").value = t.purpose || "";
   document.getElementById("editDescription").value = t.description || "";
   const list = document.getElementById("editChargesList"); list.innerHTML = "";
-  const charges = Array.isArray(t.charges) ? t.charges : (Number(t.charge) ? [{amount:Number(t.charge),comment:""}] : []);
-  charges.forEach(c => addEditChargeRow(c.amount, c.comment));
+  const charges = Array.isArray(t.charges) ? t.charges : (Number(t.charge) ? [{amount:Number(t.charge),kind:"fixed",comment:""}] : []);
+  charges.forEach(addEditChargeRow);
   updateEditFields();
   document.getElementById("editModal").classList.add("open");
+  document.getElementById("editModal").setAttribute("aria-hidden","false");
 };
-function addEditChargeRow(amount = "", comment = "") { const row = document.createElement("div"); row.className = "charge-row"; row.innerHTML = `<input class="edit-charge-amount" type="number" min="0" step="0.01" value="${amount}" placeholder="Charge amount"><input class="edit-charge-comment" type="text" value="${escapeHtml(comment)}" placeholder="Charge comment"><button type="button" class="remove-charge">×</button>`; row.querySelector(".remove-charge").addEventListener("click", () => row.remove()); document.getElementById("editChargesList").appendChild(row); }
 function updateEditFields() { document.getElementById("editOtherTypeWrap").style.display = document.getElementById("editType").value === "other" ? "block" : "none"; document.getElementById("editOtherPlatformWrap").style.display = document.getElementById("editPlatform").value === "Other" ? "block" : "none"; }
-window.closeEditModal = function() { editingTransactionId = null; document.getElementById("editModal").classList.remove("open"); };
+window.closeEditModal = function() { editingTransactionId = null; document.getElementById("editModal").classList.remove("open"); document.getElementById("editModal").setAttribute("aria-hidden","true"); };
 window.saveEditedTransaction = async function() {
   if (!editingTransactionId) return;
-  const type = document.getElementById("editType").value, platformSelect = document.getElementById("editPlatform").value, otherType = document.getElementById("editOtherType").value.trim(), otherPlatform = document.getElementById("editOtherPlatform").value.trim(), amount = Number(document.getElementById("editAmount").value);
+  const type = document.getElementById("editType").value, platformSelect = document.getElementById("editPlatform").value, amount = Number(document.getElementById("editAmount").value);
+  const otherType = document.getElementById("editOtherType").value.trim(), otherPlatform = document.getElementById("editOtherPlatform").value.trim();
   if (!document.getElementById("editPerson").value || !document.getElementById("editDate").value || !document.getElementById("editTime").value || !amount || amount <= 0) return alert("Please fill the required fields");
   if (type === "other" && !otherType) return alert("Enter other type");
   if (platformSelect === "Other" && !otherPlatform) return alert("Enter other platform");
-  const charges = [...document.querySelectorAll("#editChargesList .charge-row")].map(row => ({ amount: Number(row.querySelector(".edit-charge-amount").value) || 0, comment: row.querySelector(".edit-charge-comment").value.trim() })).filter(c => c.amount > 0);
-  await update(ref(db, `mypayments/transactions/${editingTransactionId}`), { personId: document.getElementById("editPerson").value, date: document.getElementById("editDate").value, time: document.getElementById("editTime").value, type, otherType, amount, amountComment: document.getElementById("editAmountComment").value.trim(), charges, platform: platformSelect === "Other" ? otherPlatform : platformSelect, purpose: document.getElementById("editPurpose").value.trim(), description: document.getElementById("editDescription").value.trim() });
-  closeEditModal();
+  try {
+    await update(ref(db, `mypayments/transactions/${editingTransactionId}`), { personId: document.getElementById("editPerson").value, date: document.getElementById("editDate").value, time: document.getElementById("editTime").value, type, otherType, amount, amountComment: document.getElementById("editAmountComment").value.trim(), charges: getEditCharges(), platform: platformSelect === "Other" ? otherPlatform : platformSelect, purpose: document.getElementById("editPurpose").value.trim(), description: document.getElementById("editDescription").value.trim() });
+    closeEditModal();
+  } catch (e) { alert(`Could not save changes: ${e.message}`); }
 };
 
 document.getElementById("addPersonBtn").addEventListener("click", window.addPerson);
@@ -85,24 +170,22 @@ document.getElementById("transactionForm").addEventListener("submit", async even
   event.preventDefault();
   const personId = document.getElementById("transactionPerson").value, date = document.getElementById("transactionDate").value, time = document.getElementById("transactionTime").value, type = document.getElementById("transactionType").value, amount = Number(document.getElementById("amount").value), platformSelect = document.getElementById("platform").value, otherPlatform = document.getElementById("otherPlatform").value.trim(), otherType = document.getElementById("otherType").value.trim();
   if (!personId) return alert("Select a person"); if (!date) return alert("Select a date"); if (!time) return alert("Select a time"); if (!amount || amount <= 0) return alert("Enter a valid amount"); if (type === "other" && !otherType) return alert("Enter other type"); if (platformSelect === "Other" && !otherPlatform) return alert("Enter other platform");
-  await set(push(transactionsRef), { personId, date, time, type, otherType, amount, amountComment: document.getElementById("amountComment").value.trim(), charges: getChargesFromForm(), platform: platformSelect === "Other" ? otherPlatform : platformSelect, purpose: document.getElementById("purpose").value.trim(), description: document.getElementById("description").value.trim(), createdAt: Date.now() });
-  resetTransactionForm();
+  try { await set(push(transactionsRef), { personId, date, time, type, otherType, amount, amountComment: document.getElementById("amountComment").value.trim(), charges: getChargesFromForm(), platform: platformSelect === "Other" ? otherPlatform : platformSelect, purpose: document.getElementById("purpose").value.trim(), description: document.getElementById("description").value.trim(), createdAt: Date.now() }); resetTransactionForm(); } catch (e) { alert(`Could not save transaction: ${e.message}`); }
 });
-
 function updatePersonDropdowns() {
   const tp = document.getElementById("transactionPerson"), fp = document.getElementById("filterPerson").value || "all";
-  tp.innerHTML = '<option value="">Select person</option>';
-  document.getElementById("filterPerson").innerHTML = '<option value="all">All people</option>';
+  tp.innerHTML = '<option value="">Select person</option>'; document.getElementById("filterPerson").innerHTML = '<option value="all">All people</option>';
   Object.entries(people).forEach(([id,p]) => { tp.insertAdjacentHTML("beforeend", `<option value="${id}">${escapeHtml(p.name)}</option>`); document.getElementById("filterPerson").insertAdjacentHTML("beforeend", `<option value="${id}">${escapeHtml(p.name)}</option>`); });
   document.getElementById("filterPerson").value = people[fp] ? fp : "all";
 }
 function renderLedger() { displayPeople(); displayTransactions(); }
 function displayPeople() {
-  const c = document.getElementById("peopleList"); c.innerHTML = ""; if (!Object.keys(people).length) return c.innerHTML = "<p class='empty'>No people added yet.</p>";
-  Object.entries(people).forEach(([id,p]) => { const x=personTotals(id), balance=x.credit-x.debit, d=document.createElement("div"); d.className="person"; d.innerHTML=`<div class="person-main" onclick="location.href='person.html?id=${encodeURIComponent(id)}'"><div class="person-name">${escapeHtml(p.name)}</div><div class="person-summary"><span class="taken-text">Credit ₹${formatMoney(x.credit)}</span><span class="repaid-text">Debit ₹${formatMoney(x.debit)}</span></div></div><div class="person-right"><div class="balance ${balance>=0?'positive':'negative'}">₹${formatMoney(balance)}</div><div class="person-actions"><button class="icon-btn edit-btn" onclick="event.stopPropagation();editPerson('${id}')" title="Edit person">Edit</button><button class="icon-btn delete-icon" onclick="event.stopPropagation();deletePerson('${id}')" title="Delete person">Delete</button></div></div>`; c.appendChild(d); });
+  const c = document.getElementById("peopleList"); c.innerHTML = "";
+  if (!Object.keys(people).length) return c.innerHTML = "<p class='empty'>No people added yet.</p>";
+  Object.entries(people).forEach(([id,p]) => { const x=personTotals(id), balance=x.credit-x.debit, d=document.createElement("div"); d.className="person"; d.innerHTML=`<div class="person-main" onclick="location.href='person.html?id=${encodeURIComponent(id)}'"><div class="person-name">${escapeHtml(p.name)}</div><div class="person-summary"><span class="taken-text">Credit ₹${formatMoney(x.credit)}</span><span class="repaid-text">Debit ₹${formatMoney(x.debit)}</span></div></div><div class="person-right"><div class="balance ${balance>=0?'positive':'negative'}">₹${formatMoney(balance)}</div><div class="person-actions"><button class="icon-btn edit-btn" onclick="event.stopPropagation();editPerson('${id}')">Edit</button><button class="icon-btn delete-icon" onclick="event.stopPropagation();deletePerson('${id}')">Delete</button></div></div>`; c.appendChild(d); });
 }
 function displayTransactions() {
-  const c=document.getElementById("transactionsList"),filter=document.getElementById("filterPerson").value; c.innerHTML="";
+  const c=document.getElementById("transactionsList"), filter=document.getElementById("filterPerson").value; c.innerHTML="";
   const ids=(filter==="all"?Object.keys(people):[filter]).filter(id=>people[id]);
   ids.forEach(personId=>{
     const section=document.createElement("div"); section.className="person-ledger"; const x=personTotals(personId);
@@ -114,7 +197,7 @@ function displayTransactions() {
   if(!ids.length)c.innerHTML="<p class='empty'>No people added yet.</p>";
 }
 function createTableRow(id,t) {
-  const tr=document.createElement("tr"), charges=Array.isArray(t.charges)?t.charges:(Number(t.charge)?[{amount:Number(t.charge),comment:""}]:[]), chargeSum=chargeTotal(charges), chargeComments=charges.map(c=>c.comment).filter(Boolean).join("; ");
+  const tr=document.createElement("tr"), charges=Array.isArray(t.charges)?t.charges:(Number(t.charge)?[{amount:Number(t.charge),kind:"fixed",comment:""}]:[]), chargeSum=chargeTotal(charges, Number(t.amount)||0), chargeComments=charges.map(c=>`${chargeLabel(c,Number(t.amount)||0)}${c.comment?` (${c.comment})`:""}`).join("; ");
   const date=t.date||"", time=fallbackTime(t);
   tr.innerHTML=`<td>${escapeHtml(date)}</td><td>${escapeHtml(time)}</td><td>₹${formatMoney(t.amount)}</td><td>${escapeHtml(t.amountComment||"")}</td><td>₹${formatMoney(chargeSum)}</td><td>${escapeHtml(chargeComments)}</td><td class="${normalizedType(t)==="credit"?"taken-text":"repaid-text"}">${normalizedType(t)==="credit"?"+":"-"}₹${formatMoney(transactionTotal(t))}</td><td>${escapeHtml(t.description||"")}</td><td>${escapeHtml(t.purpose||"")}</td><td><span class="type-badge ${normalizedType(t)}">${escapeHtml(typeLabel(t))}</span></td><td><span class="platform-badge">${escapeHtml(platformLabel(t))}</span></td><td class="action-cell"><button class="table-action edit-action" onclick="editTransaction('${id}')">Edit</button><button class="table-action delete-action" onclick="deleteTransaction('${id}')">Delete</button></td>`;
   return tr;
