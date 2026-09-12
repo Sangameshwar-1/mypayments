@@ -1,5 +1,6 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/11.10.0/firebase-app.js";
 import { getDatabase, ref, push, set, update, remove, onValue } from "https://www.gstatic.com/firebasejs/11.10.0/firebase-database.js";
+import { getAuth, signInAnonymously } from "https://www.gstatic.com/firebasejs/11.10.0/firebase-auth.js";
 
 const firebaseConfig = {
   apiKey: "AIzaSyAHt06CtReHyQRip-QqEGILFjOWH5cI98c",
@@ -14,5 +15,15 @@ const firebaseConfig = {
 
 const app = initializeApp(firebaseConfig);
 const db = getDatabase(app);
+const auth = getAuth(app);
 
-export { db, ref, push, set, update, remove, onValue };
+// Authenticate before any Realtime Database read/write.
+const authReady = signInAnonymously(auth).then((credential) => {
+  console.log("Firebase anonymous auth ready. uid:", credential.user.uid);
+  return credential.user;
+}).catch((error) => {
+  console.error("Firebase anonymous authentication failed:", error);
+  throw error;
+});
+
+export { db, auth, authReady, ref, push, set, update, remove, onValue };
