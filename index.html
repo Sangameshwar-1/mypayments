@@ -6,15 +6,17 @@
 <section class="summary"><div class="card"><span>Credit</span><strong id="totalTaken" class="taken-text">₹0</strong></div><div class="card"><span>Debit</span><strong id="totalRepaid" class="repaid-text">₹0</strong></div><div class="card"><span>Balance</span><strong id="totalOutstanding">₹0</strong></div></section>
 <section class="box"><h2>Add Person</h2><div class="row"><input id="personName" placeholder="Person name"><button id="addPersonBtn">Add Person</button></div></section>
 <section class="box"><h2>Add Transaction</h2><form id="transactionForm"><div class="form-grid">
-<div><label>Person</label><select id="transactionPerson" required><option value="">Select person</option></select></div><div><label>Date</label><input type="date" id="transactionDate" required></div>
-<div><label>Type</label><select id="transactionType"><option value="credit">Credit</option><option value="debit">Debit</option><option value="other">Other</option></select></div>
+<div><label>Person</label><select id="transactionPerson" required><option value="">Select person</option></select></div>
+<div><label>Date</label><input type="date" id="transactionDate" required></div>
+<div><label>Type</label><select id="transactionType"><option value="debit">Debit</option><option value="credit">Credit</option><option value="other">Other</option></select></div>
 <div id="otherTypeWrap" class="conditional-field"><label>Other type</label><input id="otherType" placeholder="Enter type"></div>
-<div><label>Platform</label><select id="platform"><option value="PhonePe">PhonePe</option><option value="GPay">GPay</option><option value="WhatsApp">WhatsApp</option><option value="Amazon Pay">Amazon Pay</option><option value="Cash">Cash</option><option value="Other">Other</option></select></div>
+<div><label>Platform</label><select id="platform"><option value="PhonePe">PhonePe</option><option value="GPay">GPay</option><option value="WhatsApp">WhatsApp</option><option value="Other">Other</option></select></div>
 <div id="otherPlatformWrap" class="conditional-field"><label>Other platform</label><input id="otherPlatform" placeholder="Enter platform"></div>
-<div><label>Amount</label><input type="number" id="amount" min="0" step="0.01" required placeholder="e.g. 2575"></div><div><label>Amount comment</label><input id="amountComment" placeholder="e.g. includes 3% PhonePe charge"></div>
+<div><label>Amount</label><input type="number" id="amount" min="0" step="0.01" required placeholder="e.g. 2575"></div>
+<div><label>Amount comment</label><input id="amountComment" placeholder="Comment for amount"></div>
 </div>
 <div class="charge-box"><div class="charge-title"><strong>Charges</strong><button type="button" id="addChargeBtn" class="small-btn">+ Add charge</button></div><p class="hint">Add each charge separately.</p><div id="chargesList"></div><div id="noCharges" class="empty-charge">No charges</div><div id="chargePreview" class="charge-preview">Charges: ₹0 • Total: ₹0</div></div>
-<label>Purpose</label><input id="purpose" placeholder="e.g. phonepe, general, shopping"><label>Total comment</label><input id="description" placeholder="Optional comment about the transaction"><button type="submit">Add Transaction</button>
+<label>Purpose</label><input id="purpose" placeholder="e.g. phonepe, general, shopping"><label>Total comment</label><input id="description" placeholder="Comment for total"><button type="submit">Add Transaction</button>
 </form></section>
 <section class="box"><div class="section-header"><h2>People</h2></div><div id="peopleList">Loading...</div></section>
 <section class="box"><div class="section-header"><h2>Person-wise Ledger</h2><select id="filterPerson"><option value="all">All people</option></select></div><div id="transactionsList">No transactions</div></section>
