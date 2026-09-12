@@ -4,24 +4,22 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Person Details - My Payments</title>
-  <link rel="stylesheet" href="style.css">
+  <link rel="stylesheet" href="style.css?v=4">
 </head>
 <body>
-  <header><h1 id="personTitle">Person Details</h1><p>Detailed payment ledger</p></header>
+  <header><div class="header-inner"><div><div class="eyebrow">PERSONAL FINANCE</div><h1 id="personTitle">Person Details</h1><p>Detailed payment ledger</p></div></div></header>
   <main>
     <div class="detail-actions"><button id="backBtn" class="secondary-btn">← Back</button></div>
-
     <section class="summary">
-      <div class="card"><span>Received</span><strong id="detailReceived" class="taken-text">₹0</strong></div>
-      <div class="card"><span>Repaid</span><strong id="detailRepaid" class="repaid-text">₹0</strong></div>
-      <div class="card"><span>Balance</span><strong id="detailBalance">₹0</strong></div>
+      <div class="card credit-card"><span>Received</span><strong id="detailReceived" class="taken-text">₹0</strong></div>
+      <div class="card debit-card"><span>Repaid</span><strong id="detailRepaid" class="repaid-text">₹0</strong></div>
+      <div class="card balance-card"><span>Balance</span><strong id="detailBalance">₹0</strong></div>
     </section>
-
     <section class="box">
-      <div class="section-header"><h2>Transactions</h2></div>
+      <div class="section-header"><div><h2>Transactions</h2><p>Edit or delete any transaction directly from the ledger.</p></div></div>
       <div id="detailTransactions">Loading...</div>
     </section>
   </main>
-  <script type="module" src="person.js"></script>
+  <script type="module" src="person.js?v=4"></script>
 </body>
 </html>
