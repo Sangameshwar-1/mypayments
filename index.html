@@ -7,11 +7,11 @@
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
-  <header><h1>My Payments</h1><p>Payment & repayment tracker</p></header>
+  <header><h1>My Payments</h1><p>Simple personal payment ledger</p></header>
   <main>
     <section class="summary">
-      <div class="card"><span>Total Taken</span><strong id="totalTaken">₹0</strong></div>
-      <div class="card"><span>Total Repaid</span><strong id="totalRepaid">₹0</strong></div>
+      <div class="card"><span>Received</span><strong id="totalTaken" class="taken-text">₹0</strong></div>
+      <div class="card"><span>Repaid</span><strong id="totalRepaid" class="repaid-text">₹0</strong></div>
       <div class="card"><span>Outstanding</span><strong id="totalOutstanding">₹0</strong></div>
     </section>
 
@@ -30,9 +30,9 @@
       <form id="transactionForm">
         <label>Person</label><select id="transactionPerson" required><option value="">Select person</option></select>
         <label>Date</label><input type="date" id="transactionDate" required>
-        <label>Type</label><select id="transactionType"><option value="taken">Taken</option><option value="repaid">Repaid</option></select>
+        <label>Type</label><select id="transactionType"><option value="taken">Received</option><option value="repaid">Repaid</option></select>
         <label>Amount</label><input type="number" id="amount" min="0" step="0.01" required placeholder="Amount">
-        <label>Charge</label><input type="number" id="charge" min="0" step="0.01" value="0" placeholder="Extra charge">
+        <label for="charge">Charge</label><input type="number" id="charge" min="0" step="0.01" value="0" placeholder="Extra charge / fee">
         <label>Payment Method</label><select id="method"><option>PhonePe</option><option>Google Pay</option><option>Amazon Pay</option><option>Cash</option><option>General</option><option>Other</option></select>
         <label>Description</label><input id="description" placeholder="Description">
         <button type="submit">Add Transaction</button>
@@ -40,7 +40,7 @@
     </section>
 
     <section class="box">
-      <div class="section-header"><h2>Transactions</h2><select id="filterPerson"><option value="all">All people</option></select></div>
+      <div class="section-header"><h2>Person-wise Ledger</h2><select id="filterPerson"><option value="all">All people</option></select></div>
       <div id="transactionsList">No transactions</div>
     </section>
   </main>
