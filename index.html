@@ -23,29 +23,25 @@
     <section class="box">
       <h2>Add Transaction</h2>
       <form id="transactionForm">
-        <label>Person</label><select id="transactionPerson" required><option value="">Select person</option></select>
-        <label>Date</label><input type="date" id="transactionDate" required>
-        <label>Type</label><select id="transactionType"><option value="taken">Received</option><option value="repaid">Repaid</option></select>
-        <label>Payment Method</label><select id="method"><option value="PhonePe">PhonePe</option><option value="Google Pay">Google Pay</option><option value="Amazon Pay">Amazon Pay</option><option value="Cash">Cash</option><option value="General">General</option><option value="Other">Other</option></select>
-        <label>Amount</label><input type="number" id="amount" min="0" step="0.01" required placeholder="Amount">
+        <div class="form-grid">
+          <div><label>Person</label><select id="transactionPerson" required><option value="">Select person</option></select></div>
+          <div><label>Date</label><input type="date" id="transactionDate" required></div>
+          <div><label>Type</label><select id="transactionType"><option value="taken">Received</option><option value="repaid">Repaid</option></select></div>
+          <div><label>Platform</label><select id="method"><option value="PhonePe">PhonePe</option><option value="Google Pay">Google Pay</option><option value="Amazon Pay">Amazon Pay</option><option value="Cash">Cash</option><option value="General">General</option><option value="Other">Other</option></select></div>
+          <div><label>Amount</label><input type="number" id="amount" min="0" step="0.01" required placeholder="e.g. 2575"></div>
+          <div><label>Purpose</label><input id="purpose" placeholder="e.g. taken, general, phonepe"></div>
+        </div>
 
-        <div class="fee-options">
-          <label>Charge mode</label>
-          <select id="chargeMode">
-            <option value="none">No automatic charge</option>
-            <option value="fixed">Fixed charge</option>
-            <option value="percent">Percentage charge</option>
-            <option value="both">Percentage + fixed extra</option>
-          </select>
-          <label id="chargeRateLabel">Charge %</label>
-          <input type="number" id="chargeRate" min="0" step="0.01" value="0" placeholder="e.g. 1.18">
-          <label id="fixedChargeLabel">Fixed extra charge</label>
-          <input type="number" id="fixedCharge" min="0" step="0.01" value="0" placeholder="e.g. 30">
-          <label class="checkbox-row"><input type="checkbox" id="amountIncludesRate"> Amount already includes percentage charge</label>
+        <div class="charge-box">
+          <div class="charge-title"><strong>Charges</strong><button type="button" id="addChargeBtn" class="small-btn">+ Add charge</button></div>
+          <p class="hint">Add each charge separately so your original notes stay clear.</p>
+          <div id="chargesList"></div>
+          <div id="noCharges" class="empty-charge">No extra charges</div>
           <div id="chargePreview" class="charge-preview">Total: ₹0</div>
         </div>
 
-        <label>Description</label><input id="description" placeholder="e.g. PhonePe / taken / general">
+        <label>Amount note</label><input id="amountComment" placeholder="e.g. includes 3% PhonePe charge">
+        <label>General note</label><input id="description" placeholder="Optional note">
         <button type="submit">Add Transaction</button>
       </form>
     </section>
