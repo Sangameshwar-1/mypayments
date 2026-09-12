@@ -6,6 +6,31 @@ let transactions = {};
 const peopleRef = ref(db, "mypayments/people");
 const transactionsRef = ref(db, "mypayments/transactions");
 
+function percentageCharge(amount, rate, includesRate) {
+  const value = Number(amount) || 0;
+  const percent = Number(rate) || 0;
+  if (!percent) return 0;
+  return includesRate ? value - (value / (1 + percent / 100)) : value * percent / 100;
+}
+
+function calculateCharges() {
+  const amount = Number(document.getElementById("amount").value) || 0;
+  const mode = document.getElementById("chargeMode").value;
+  const rate = Number(document.getElementById("chargeRate").value) || 0;
+  const fixed = Number(document.getElementById("fixedCharge").value) || 0;
+  const includesRate = document.getElementById("amountIncludesRate").checked;
+
+  let rateCharge = 0;
+  let fixedCharge = 0;
+  if (mode === "percent" || mode === "both") rateCharge = percentageCharge(amount, rate, includesRate);
+  if (mode === "fixed" || mode === "both") fixedCharge = fixed;
+
+  const total = amount + rateCharge + fixedCharge;
+  document.getElementById("chargePreview").textContent =
+    `Charge: ₹${formatMoney(rateCharge + fixedCharge)} • Total: ₹${formatMoney(total)}`;
+  return { rateCharge, fixedCharge, total };
+}
+
 function transactionTotal(t) {
   return (Number(t.amount) || 0) + (Number(t.charge) || 0);
 }
@@ -18,11 +43,6 @@ function personTotals(personId) {
     else totals.repaid += total;
     return totals;
   }, { received: 0, repaid: 0 });
-}
-
-function getPersonBalance(personId) {
-  const totals = personTotals(personId);
-  return totals.received - totals.repaid;
 }
 
 window.addPerson = async function () {
@@ -55,9 +75,10 @@ document.getElementById("transactionForm").addEventListener("submit", async (eve
   const date = document.getElementById("transactionDate").value;
   const type = document.getElementById("transactionType").value;
   const amount = Number(document.getElementById("amount").value);
-  const charge = Number(document.getElementById("charge").value) || 0;
   const method = document.getElementById("method").value;
   const description = document.getElementById("description").value.trim();
+  const { rateCharge, fixedCharge, total } = calculateCharges();
+  const charge = rateCharge + fixedCharge;
 
   if (!personId) return alert("Select a person");
   if (!date) return alert("Select a date");
@@ -65,10 +86,24 @@ document.getElementById("transactionForm").addEventListener("submit", async (eve
   if (charge < 0) return alert("Charge cannot be negative");
 
   await set(push(transactionsRef), {
-    personId, date, type, amount, charge, method, description, createdAt: Date.now()
+    personId,
+    date,
+    type,
+    amount,
+    charge,
+    chargeRate: rateCharge,
+    fixedCharge,
+    method,
+    description,
+    createdAt: Date.now()
   });
 
   event.target.reset();
+  document.getElementById("chargeMode").value = "none";
+  document.getElementById("chargeRate").value = "0";
+  document.getElementById("fixedCharge").value = "0";
+  updateChargeFields();
+  calculateCharges();
   setToday();
 });
 
@@ -178,13 +213,14 @@ function displayTransactions() {
 function createTransactionRow(id, t) {
   const total = transactionTotal(t);
   const received = t.type === "taken";
+  const chargeText = Number(t.charge) > 0 ? ` • Charge ₹${formatMoney(t.charge)}` : "";
   const row = document.createElement("div");
   row.className = `transaction ${received ? "received-row" : "repaid-row"}`;
   row.innerHTML = `
     <div class="transaction-info">
       <div class="transaction-date">${escapeHtml(t.date || "")}</div>
       <div class="transaction-description">${escapeHtml(t.description || t.method || (received ? "Received" : "Repaid"))}</div>
-      <div class="transaction-meta">${escapeHtml(t.method || "Other")}${Number(t.charge) > 0 ? ` • Charge ₹${formatMoney(t.charge)}` : ""}</div>
+      <div class="transaction-meta">${escapeHtml(t.method || "Other")}${chargeText}</div>
     </div>
     <div class="transaction-amount ${received ? "taken-text" : "repaid-text"}">${received ? "+" : "-"}₹${formatMoney(total)}</div>
     <button class="delete-btn" onclick="deleteTransaction('${id}')">Delete</button>
@@ -198,11 +234,29 @@ window.deleteTransaction = async function (id) {
 };
 
 document.getElementById("filterPerson").addEventListener("change", displayTransactions);
-
-document.getElementById("transactionType").addEventListener("change", () => {
-  const label = document.querySelector('label[for="charge"]');
-  if (label) label.textContent = document.getElementById("transactionType").value === "taken" ? "Charge" : "Charge / Repayment fee";
+document.getElementById("amount").addEventListener("input", calculateCharges);
+document.getElementById("chargeRate").addEventListener("input", calculateCharges);
+document.getElementById("fixedCharge").addEventListener("input", calculateCharges);
+document.getElementById("amountIncludesRate").addEventListener("change", calculateCharges);
+document.getElementById("chargeMode").addEventListener("change", () => {
+  updateChargeFields();
+  calculateCharges();
 });
+
+function updateChargeFields() {
+  const mode = document.getElementById("chargeMode").value;
+  const rateLabel = document.getElementById("chargeRateLabel");
+  const rateInput = document.getElementById("chargeRate");
+  const fixedLabel = document.getElementById("fixedChargeLabel");
+  const fixedInput = document.getElementById("fixedCharge");
+  const checkbox = document.getElementById("amountIncludesRate");
+  const usesRate = mode === "percent" || mode === "both";
+  const usesFixed = mode === "fixed" || mode === "both";
+
+  rateLabel.style.display = rateInput.style.display = usesRate ? "block" : "none";
+  fixedLabel.style.display = fixedInput.style.display = usesFixed ? "block" : "none";
+  checkbox.parentElement.style.display = usesRate ? "flex" : "none";
+}
 
 function updateDashboard() {
   let totalTaken = 0;
@@ -231,3 +285,5 @@ function setToday() {
 }
 
 setToday();
+updateChargeFields();
+calculateCharges();
