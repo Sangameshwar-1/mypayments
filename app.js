@@ -6,33 +6,13 @@ let transactions = {};
 const peopleRef = ref(db, "mypayments/people");
 const transactionsRef = ref(db, "mypayments/transactions");
 
-function percentageCharge(amount, rate, includesRate) {
-  const value = Number(amount) || 0;
-  const percent = Number(rate) || 0;
-  if (!percent) return 0;
-  return includesRate ? value - (value / (1 + percent / 100)) : value * percent / 100;
-}
-
-function calculateCharges() {
-  const amount = Number(document.getElementById("amount").value) || 0;
-  const mode = document.getElementById("chargeMode").value;
-  const rate = Number(document.getElementById("chargeRate").value) || 0;
-  const fixed = Number(document.getElementById("fixedCharge").value) || 0;
-  const includesRate = document.getElementById("amountIncludesRate").checked;
-
-  let rateCharge = 0;
-  let fixedCharge = 0;
-  if (mode === "percent" || mode === "both") rateCharge = percentageCharge(amount, rate, includesRate);
-  if (mode === "fixed" || mode === "both") fixedCharge = fixed;
-
-  const total = amount + rateCharge + fixedCharge;
-  document.getElementById("chargePreview").textContent =
-    `Charge: ₹${formatMoney(rateCharge + fixedCharge)} • Total: ₹${formatMoney(total)}`;
-  return { rateCharge, fixedCharge, total };
+function chargeTotal(charges = []) {
+  return charges.reduce((sum, c) => sum + (Number(c.amount) || 0), 0);
 }
 
 function transactionTotal(t) {
-  return (Number(t.amount) || 0) + (Number(t.charge) || 0);
+  if (Array.isArray(t.charges)) return (Number(t.amount) || 0) + chargeTotal(t.charges);
+  return (Number(t.amount) || 0) + (Number(t.charge) || 0); // old data compatibility
 }
 
 function personTotals(personId) {
@@ -45,6 +25,36 @@ function personTotals(personId) {
   }, { received: 0, repaid: 0 });
 }
 
+function getChargesFromForm() {
+  return [...document.querySelectorAll(".charge-row")].map((row) => ({
+    amount: Number(row.querySelector(".charge-amount").value) || 0,
+    comment: row.querySelector(".charge-comment").value.trim()
+  })).filter((c) => c.amount > 0);
+}
+
+function calculatePreview() {
+  const amount = Number(document.getElementById("amount").value) || 0;
+  const charges = getChargesFromForm();
+  const chargesTotal = chargeTotal(charges);
+  document.getElementById("chargePreview").textContent =
+    `Charges: ₹${formatMoney(chargesTotal)} • Total: ₹${formatMoney(amount + chargesTotal)}`;
+  document.getElementById("noCharges").style.display = charges.length ? "none" : "block";
+}
+
+function addChargeRow(amount = "", comment = "") {
+  const row = document.createElement("div");
+  row.className = "charge-row";
+  row.innerHTML = `
+    <input class="charge-amount" type="number" min="0" step="0.01" value="${amount}" placeholder="Charge amount">
+    <input class="charge-comment" type="text" value="${escapeHtml(comment)}" placeholder="Why? e.g. extra 1.18% charge">
+    <button type="button" class="remove-charge" aria-label="Remove charge">×</button>
+  `;
+  row.querySelectorAll("input").forEach((input) => input.addEventListener("input", calculatePreview));
+  row.querySelector(".remove-charge").addEventListener("click", () => { row.remove(); calculatePreview(); });
+  document.getElementById("chargesList").appendChild(row);
+  calculatePreview();
+}
+
 window.addPerson = async function () {
   const input = document.getElementById("personName");
   const name = input.value.trim();
@@ -54,6 +64,8 @@ window.addPerson = async function () {
 };
 
 document.getElementById("addPersonBtn").addEventListener("click", window.addPerson);
+document.getElementById("addChargeBtn").addEventListener("click", () => addChargeRow());
+document.getElementById("amount").addEventListener("input", calculatePreview);
 
 onValue(peopleRef, (snapshot) => {
   people = snapshot.val() || {};
@@ -76,34 +88,31 @@ document.getElementById("transactionForm").addEventListener("submit", async (eve
   const type = document.getElementById("transactionType").value;
   const amount = Number(document.getElementById("amount").value);
   const method = document.getElementById("method").value;
+  const purpose = document.getElementById("purpose").value.trim();
+  const amountComment = document.getElementById("amountComment").value.trim();
   const description = document.getElementById("description").value.trim();
-  const { rateCharge, fixedCharge } = calculateCharges();
-  const charge = rateCharge + fixedCharge;
+  const charges = getChargesFromForm();
 
   if (!personId) return alert("Select a person");
   if (!date) return alert("Select a date");
   if (!amount || amount <= 0) return alert("Enter a valid amount");
-  if (charge < 0) return alert("Charge cannot be negative");
 
   await set(push(transactionsRef), {
     personId,
     date,
     type,
     amount,
-    charge,
-    chargeRate: rateCharge,
-    fixedCharge,
+    amountComment,
+    charges,
     method,
+    purpose,
     description,
     createdAt: Date.now()
   });
 
   event.target.reset();
-  document.getElementById("chargeMode").value = "none";
-  document.getElementById("chargeRate").value = "0";
-  document.getElementById("fixedCharge").value = "0";
-  updateChargeFields();
-  calculateCharges();
+  document.getElementById("chargesList").innerHTML = "";
+  calculatePreview();
   setToday();
 });
 
@@ -152,25 +161,13 @@ function displayPeople() {
     div.className = "person";
     div.tabIndex = 0;
     div.setAttribute("role", "button");
-    div.setAttribute("aria-label", `Open ${people[id].name} details`);
     div.innerHTML = `
-      <div>
-        <div class="person-name">${escapeHtml(people[id].name)}</div>
-        <div class="person-summary">
-          <span class="taken-text">Received ₹${formatMoney(totals.received)}</span>
-          <span class="repaid-text">Repaid ₹${formatMoney(totals.repaid)}</span>
-        </div>
-      </div>
-      <div class="balance ${balance >= 0 ? "positive" : "negative"}">₹${formatMoney(balance)}</div>
-    `;
+      <div><div class="person-name">${escapeHtml(people[id].name)}</div>
+        <div class="person-summary"><span class="taken-text">Received ₹${formatMoney(totals.received)}</span><span class="repaid-text">Repaid ₹${formatMoney(totals.repaid)}</span></div>
+      </div><div class="balance ${balance >= 0 ? "positive" : "negative"}">₹${formatMoney(balance)}</div>`;
     const openPerson = () => { window.location.href = `person.html?id=${encodeURIComponent(id)}`; };
     div.addEventListener("click", openPerson);
-    div.addEventListener("keydown", (event) => {
-      if (event.key === "Enter" || event.key === " ") {
-        event.preventDefault();
-        openPerson();
-      }
-    });
+    div.addEventListener("keydown", (event) => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); openPerson(); } });
     container.appendChild(div);
   });
 }
@@ -179,44 +176,22 @@ function displayTransactions() {
   const container = document.getElementById("transactionsList");
   const filter = document.getElementById("filterPerson").value;
   container.innerHTML = "";
-
   const peopleToShow = filter === "all" ? Object.keys(people) : [filter];
   const activePeople = peopleToShow.filter((id) => people[id]);
-
-  if (!activePeople.length) {
-    container.innerHTML = "<p>No people added yet.</p>";
-    return;
-  }
+  if (!activePeople.length) { container.innerHTML = "<p>No people added yet.</p>"; return; }
 
   activePeople.forEach((personId) => {
     const personTransactions = Object.entries(transactions)
       .filter(([, t]) => t.personId === personId)
       .sort((a, b) => new Date(b[1].date) - new Date(a[1].date) || (b[1].createdAt || 0) - (a[1].createdAt || 0));
-
     const totals = personTotals(personId);
     const balance = totals.received - totals.repaid;
     const section = document.createElement("div");
     section.className = "person-ledger";
-    section.innerHTML = `
-      <div class="ledger-header">
-        <div>
-          <h3>${escapeHtml(people[personId].name)}</h3>
-          <span class="ledger-balance">Balance: ₹${formatMoney(balance)}</span>
-        </div>
-        <div class="ledger-totals">
-          <span class="taken-text">+₹${formatMoney(totals.received)}</span>
-          <span class="repaid-text">-₹${formatMoney(totals.repaid)}</span>
-        </div>
-      </div>
-      <div class="ledger-transactions"></div>
-    `;
-
+    section.innerHTML = `<div class="ledger-header"><div><h3>${escapeHtml(people[personId].name)}</h3><span class="ledger-balance">Balance: ₹${formatMoney(balance)}</span></div><div class="ledger-totals"><span class="taken-text">+₹${formatMoney(totals.received)}</span><span class="repaid-text">-₹${formatMoney(totals.repaid)}</span></div></div><div class="ledger-transactions"></div>`;
     const list = section.querySelector(".ledger-transactions");
-    if (!personTransactions.length) {
-      list.innerHTML = "<p class='empty'>No transactions for this person.</p>";
-    } else {
-      personTransactions.forEach(([id, t]) => list.appendChild(createTransactionRow(id, t)));
-    }
+    if (!personTransactions.length) list.innerHTML = "<p class='empty'>No transactions for this person.</p>";
+    else personTransactions.forEach(([id, t]) => list.appendChild(createTransactionRow(id, t)));
     container.appendChild(section);
   });
 }
@@ -224,18 +199,12 @@ function displayTransactions() {
 function createTransactionRow(id, t) {
   const total = transactionTotal(t);
   const received = t.type === "taken";
-  const chargeText = Number(t.charge) > 0 ? ` • Charge ₹${formatMoney(t.charge)}` : "";
+  const charges = Array.isArray(t.charges) ? t.charges : [];
+  const chargeText = charges.length ? ` • Charges ₹${formatMoney(chargeTotal(charges))}` : (Number(t.charge) > 0 ? ` • Charge ₹${formatMoney(t.charge)}` : "");
+  const purpose = t.purpose ? ` • ${t.purpose}` : "";
   const row = document.createElement("div");
   row.className = `transaction ${received ? "received-row" : "repaid-row"}`;
-  row.innerHTML = `
-    <div class="transaction-info">
-      <div class="transaction-date">${escapeHtml(t.date || "")}</div>
-      <div class="transaction-description">${escapeHtml(t.description || t.method || (received ? "Received" : "Repaid"))}</div>
-      <div class="transaction-meta">${escapeHtml(t.method || "Other")}${chargeText}</div>
-    </div>
-    <div class="transaction-amount ${received ? "taken-text" : "repaid-text"}">${received ? "+" : "-"}₹${formatMoney(total)}</div>
-    <button class="delete-btn" onclick="deleteTransaction('${id}')">Delete</button>
-  `;
+  row.innerHTML = `<div class="transaction-info"><div class="transaction-date">${escapeHtml(t.date || "")}</div><div class="transaction-description">${escapeHtml(t.description || t.purpose || (received ? "Received" : "Repaid"))}</div><div class="transaction-meta">${escapeHtml(t.method || "Other")}${purpose}${chargeText}</div></div><div class="transaction-amount ${received ? "taken-text" : "repaid-text"}">${received ? "+" : "-"}₹${formatMoney(total)}</div><button class="delete-btn" onclick="deleteTransaction('${id}')">Delete</button>`;
   return row;
 }
 
@@ -245,56 +214,18 @@ window.deleteTransaction = async function (id) {
 };
 
 document.getElementById("filterPerson").addEventListener("change", displayTransactions);
-document.getElementById("amount").addEventListener("input", calculateCharges);
-document.getElementById("chargeRate").addEventListener("input", calculateCharges);
-document.getElementById("fixedCharge").addEventListener("input", calculateCharges);
-document.getElementById("amountIncludesRate").addEventListener("change", calculateCharges);
-document.getElementById("chargeMode").addEventListener("change", () => {
-  updateChargeFields();
-  calculateCharges();
-});
-
-function updateChargeFields() {
-  const mode = document.getElementById("chargeMode").value;
-  const rateLabel = document.getElementById("chargeRateLabel");
-  const rateInput = document.getElementById("chargeRate");
-  const fixedLabel = document.getElementById("fixedChargeLabel");
-  const fixedInput = document.getElementById("fixedCharge");
-  const checkbox = document.getElementById("amountIncludesRate");
-  const usesRate = mode === "percent" || mode === "both";
-  const usesFixed = mode === "fixed" || mode === "both";
-
-  rateLabel.style.display = rateInput.style.display = usesRate ? "block" : "none";
-  fixedLabel.style.display = fixedInput.style.display = usesFixed ? "block" : "none";
-  checkbox.parentElement.style.display = usesRate ? "flex" : "none";
-}
 
 function updateDashboard() {
-  let totalTaken = 0;
-  let totalRepaid = 0;
-  Object.values(transactions).forEach((t) => {
-    if (t.type === "taken") totalTaken += transactionTotal(t);
-    else totalRepaid += transactionTotal(t);
-  });
+  let totalTaken = 0, totalRepaid = 0;
+  Object.values(transactions).forEach((t) => { if (t.type === "taken") totalTaken += transactionTotal(t); else totalRepaid += transactionTotal(t); });
   document.getElementById("totalTaken").textContent = `₹${formatMoney(totalTaken)}`;
   document.getElementById("totalRepaid").textContent = `₹${formatMoney(totalRepaid)}`;
   document.getElementById("totalOutstanding").textContent = `₹${formatMoney(totalTaken - totalRepaid)}`;
 }
 
-function formatMoney(number) {
-  return Number(number).toLocaleString("en-IN", { minimumFractionDigits: 0, maximumFractionDigits: 2 });
-}
-
-function escapeHtml(text) {
-  const div = document.createElement("div");
-  div.textContent = String(text ?? "");
-  return div.innerHTML;
-}
-
-function setToday() {
-  document.getElementById("transactionDate").value = new Date().toISOString().split("T")[0];
-}
+function formatMoney(number) { return Number(number).toLocaleString("en-IN", { minimumFractionDigits: 0, maximumFractionDigits: 2 }); }
+function escapeHtml(text) { const div = document.createElement("div"); div.textContent = String(text ?? ""); return div.innerHTML; }
+function setToday() { document.getElementById("transactionDate").value = new Date().toISOString().split("T")[0]; }
 
 setToday();
-updateChargeFields();
-calculateCharges();
+calculatePreview();
