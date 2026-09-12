@@ -21,22 +21,38 @@
     </section>
 
     <section class="box">
-      <h2>People</h2>
-      <div id="peopleList">Loading...</div>
-    </section>
-
-    <section class="box">
       <h2>Add Transaction</h2>
       <form id="transactionForm">
         <label>Person</label><select id="transactionPerson" required><option value="">Select person</option></select>
         <label>Date</label><input type="date" id="transactionDate" required>
         <label>Type</label><select id="transactionType"><option value="taken">Received</option><option value="repaid">Repaid</option></select>
+        <label>Payment Method</label><select id="method"><option value="PhonePe">PhonePe</option><option value="Google Pay">Google Pay</option><option value="Amazon Pay">Amazon Pay</option><option value="Cash">Cash</option><option value="General">General</option><option value="Other">Other</option></select>
         <label>Amount</label><input type="number" id="amount" min="0" step="0.01" required placeholder="Amount">
-        <label for="charge">Charge</label><input type="number" id="charge" min="0" step="0.01" value="0" placeholder="Extra charge / fee">
-        <label>Payment Method</label><select id="method"><option>PhonePe</option><option>Google Pay</option><option>Amazon Pay</option><option>Cash</option><option>General</option><option>Other</option></select>
-        <label>Description</label><input id="description" placeholder="Description">
+
+        <div class="fee-options">
+          <label>Charge mode</label>
+          <select id="chargeMode">
+            <option value="none">No automatic charge</option>
+            <option value="fixed">Fixed charge</option>
+            <option value="percent">Percentage charge</option>
+            <option value="both">Percentage + fixed extra</option>
+          </select>
+          <label id="chargeRateLabel">Charge %</label>
+          <input type="number" id="chargeRate" min="0" step="0.01" value="0" placeholder="e.g. 1.18">
+          <label id="fixedChargeLabel">Fixed extra charge</label>
+          <input type="number" id="fixedCharge" min="0" step="0.01" value="0" placeholder="e.g. 30">
+          <label class="checkbox-row"><input type="checkbox" id="amountIncludesRate"> Amount already includes percentage charge</label>
+          <div id="chargePreview" class="charge-preview">Total: ₹0</div>
+        </div>
+
+        <label>Description</label><input id="description" placeholder="e.g. PhonePe / taken / general">
         <button type="submit">Add Transaction</button>
       </form>
+    </section>
+
+    <section class="box">
+      <div class="section-header"><h2>People</h2></div>
+      <div id="peopleList">Loading...</div>
     </section>
 
     <section class="box">
