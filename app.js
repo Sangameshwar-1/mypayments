@@ -367,12 +367,6 @@ function exportToPdf(filter = "all") {
   const title = filter === "all" ? "My Payments Ledger" : `${people[filter]?.name || "Person"} - Payment Ledger`;
   doc.setFontSize(18); doc.setTextColor(23,32,51); doc.text(title, margin, 30);
   doc.setFontSize(9); doc.setTextColor(100,110,125); doc.text(`Generated: ${new Date().toLocaleString("en-IN")}`, margin, 45);
-  const totals = rows.reduce((x, row) => {
-    const t = transactions[Object.keys(transactions).find(id => {
-      const p = transactions[id]; return (filter === "all" || p.personId === filter) && p.date === row[1] && fallbackTime(p) === row[2] && formatMoney(p.amount) === formatMoney(Number(String(row[3]).replace(/[₹,]/g,"")));
-    })];
-    return x;
-  }, null);
   doc.autoTable({
     head: [["Person","Date","Time","Amt","Amt Cmnt","Charges","Charge Cmnt","Total","Total Cmnt","Purpose","Type","Platform"]],
     body: rows,
