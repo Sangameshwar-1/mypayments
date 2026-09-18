@@ -1,242 +1,43 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>My Payments</title>
-  <link rel="stylesheet" href="style.css?v=7">
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.28/jspdf.plugin.autotable.min.js"></script>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>My Payments</title>
+<link rel="stylesheet" href="style.css?v=8">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
 </head>
 <body>
-  <header>
-    <div class="header-inner">
-      <div>
-        <div class="eyebrow">PERSONAL FINANCE</div>
-        <h1>My Payments</h1>
-        <p>Track credits, debits and outstanding balances</p>
-      </div>
-      <div class="header-actions">
-        <button type="button" id="downloadPdfBtn" class="primary-btn">Download PDF</button>
-      </div>
-    </div>
-  </header>
-  <main>
-    <section class="summary">
-      <div class="card credit-card"><span>Credit</span><strong id="totalTaken" class="taken-text">₹0</strong></div>
-      <div class="card debit-card"><span>Debit</span><strong id="totalGiven" class="given-text">₹0</strong></div>
-      <div class="card balance-card"><span>Balance</span><strong id="totalBalance" class="balance-text">₹0</strong></div>
-    </section>
-    <section class="box">
-      <div class="box-heading">
-        <div>
-          <h2>Add Person</h2>
-          <p>Create a person to start tracking payments.</p>
-        </div>
-      </div>
-      <div class="row">
-        <input id="personName" placeholder="Person name">
-        <button type="button" id="addPersonBtn" class="primary-btn small-btn">Add Person</button>
-      </div>
-    </section>
-    <section class="box">
-      <div class="box-heading">
-        <div>
-          <h2>Add Transaction</h2>
-          <p>Record the amount, charges and payment details.</p>
-        </div>
-      </div>
-      <form id="transactionForm">
-        <div class="form-grid">
-          <div>
-            <label>Person</label>
-            <select id="transactionPerson" required>
-              <option value="">Select person</option>
-            </select>
-          </div>
-          <div>
-            <label>Date</label>
-            <input type="date" id="transactionDate" required>
-          </div>
-          <div>
-            <label>Time</label>
-            <input type="time" id="transactionTime" required>
-          </div>
-          <div>
-            <label>Type</label>
-            <select id="transactionType">
-              <option value="debit">Debit</option>
-              <option value="credit">Credit</option>
-              <option value="other">Other</option>
-            </select>
-          </div>
-          <div id="otherTypeWrap" class="conditional-field">
-            <label>Other type</label>
-            <input id="otherType" placeholder="Enter type">
-          </div>
-          <div>
-            <label>Platform</label>
-            <select id="platform">
-              <option value="PhonePe">PhonePe</option>
-              <option value="GPay">GPay</option>
-              <option value="WhatsApp">WhatsApp</option>
-              <option value="Paytm">Paytm</option>
-              <option value="Amazon Pay">Amazon Pay</option>
-              <option value="Bank Transfer">Bank Transfer</option>
-              <option value="Cash">Cash</option>
-              <option value="Other">Other</option>
-            </select>
-          </div>
-          <div id="otherPlatformWrap" class="conditional-field">
-            <label>Other platform</label>
-            <input id="otherPlatform" placeholder="Enter platform">
-          </div>
-          <div>
-            <label>Amount</label>
-            <input type="number" id="amount" min="0" step="0.01" required placeholder="e.g. 2575">
-          </div>
-          <div>
-            <label>Amount comment</label>
-            <input id="amountComment" placeholder="Optional note">
-          </div>
-        </div>
-        <div class="charge-box">
-          <div class="charge-title">
-            <div>
-              <strong>Charges</strong>
-              <span class="section-note">Optional</span>
-            </div>
-            <button type="button" id="addChargeBtn" class="small-btn">+ Add charge</button>
-          </div>
-          <div id="chargesList"></div>
-          <div class="charge-preview" id="chargePreview">Charges: ₹0 • Total: ₹0</div>
-          <div id="noCharges" class="no-charges">No additional charges added.</div>
-        </div>
-        <div class="form-grid single-bottom">
-          <div>
-            <label>Purpose</label>
-            <input id="purpose" placeholder="e.g. phonepe, shopping, general">
-          </div>
-          <div>
-            <label>Total comment</label>
-            <input id="description" placeholder="Optional details for this transfer">
-          </div>
-        </div>
-        <div class="form-actions">
-          <button type="submit" class="primary-btn">Save Transaction</button>
-        </div>
-      </form>
-    </section>
-    <section class="box">
-      <div class="section-header">
-        <div>
-          <h2>People</h2>
-          <p>Manage your contacts and open individual ledgers.</p>
-        </div>
-      </div>
-      <div id="peopleList">Loading...</div>
-    </section>
-    <section class="box">
-      <div class="section-header">
-        <div>
-          <h2>Person-wise Ledger</h2>
-          <p>Review every transaction in one place.</p>
-        </div>
-        <select id="filterPerson">
-          <option value="all">All people</option>
-        </select>
-      </div>
-      <div id="transactionsList"></div>
-    </section>
-  </main>
-
-  <div id="editModal" class="modal" aria-hidden="true">
-    <div class="modal-card">
-      <div class="modal-header">
-        <div>
-          <div class="eyebrow">TRANSACTION</div>
-          <h2 id="editTransactionTitle">Edit transaction</h2>
-        </div>
-      </div>
-      <div class="modal-body">
-        <div class="form-grid modal-grid">
-          <div>
-            <label>Person</label>
-            <select id="editPerson"></select>
-          </div>
-          <div>
-            <label>Date</label>
-            <input type="date" id="editDate">
-          </div>
-          <div>
-            <label>Time</label>
-            <input type="time" id="editTime">
-          </div>
-          <div>
-            <label>Type</label>
-            <select id="editType">
-              <option value="debit">Debit</option>
-              <option value="credit">Credit</option>
-              <option value="other">Other</option>
-            </select>
-          </div>
-          <div id="editOtherTypeWrap" class="conditional-field">
-            <label>Other type</label>
-            <input id="editOtherType" placeholder="Enter type">
-          </div>
-          <div>
-            <label>Platform</label>
-            <select id="editPlatform">
-              <option value="PhonePe">PhonePe</option>
-              <option value="GPay">GPay</option>
-              <option value="WhatsApp">WhatsApp</option>
-              <option value="Paytm">Paytm</option>
-              <option value="Amazon Pay">Amazon Pay</option>
-              <option value="Bank Transfer">Bank Transfer</option>
-              <option value="Cash">Cash</option>
-              <option value="Other">Other</option>
-            </select>
-          </div>
-          <div id="editOtherPlatformWrap" class="conditional-field">
-            <label>Other platform</label>
-            <input id="editOtherPlatform" placeholder="Enter platform">
-          </div>
-          <div>
-            <label>Amount</label>
-            <input type="number" id="editAmount" min="0" step="0.01">
-          </div>
-          <div>
-            <label>Amount comment</label>
-            <input id="editAmountComment" placeholder="Optional note">
-          </div>
-          <div>
-            <label>Purpose</label>
-            <input id="editPurpose" placeholder="Optional purpose">
-          </div>
-          <div>
-            <label>Total comment</label>
-            <input id="editDescription" placeholder="Optional details">
-          </div>
-        </div>
-
-        <div class="charge-box modal-charge-box">
-          <div class="charge-title">
-            <div>
-              <strong>Charges</strong>
-              <span class="section-note">Optional</span>
-            </div>
-            <button type="button" id="addEditChargeBtn" class="small-btn">+ Add charge</button>
-          </div>
-          <div id="editChargesList"></div>
-        </div>
-      </div>
-      <div class="modal-footer">
-        <button type="button" id="cancelEditBtn" class="secondary-btn">Cancel</button>
-        <button type="button" id="saveEditBtn" class="primary-btn">Save changes</button>
-      </div>
-    </div>
-  </div>
-
-  <script type="module" src="app.js?v=7"></script>
-</body>
-</html>
+<header><div class="header-inner"><div><div class="eyebrow">PERSONAL FINANCE</div><h1>My Payments</h1><p>Track credits, debits and outstanding balances</p></div><button id="downloadPdfBtn" type="button" class="header-pdf">Download PDF</button></div></header>
+<main>
+<section class="summary">
+<div class="card credit-card"><span>Credit</span><strong id="totalTaken" class="taken-text">₹0</strong></div>
+<div class="card debit-card"><span>Debit</span><strong id="totalGiven" class="repaid-text">₹0</strong></div>
+<div class="card balance-card"><span>Balance</span><strong id="totalBalance">₹0</strong></div>
+</section>
+<section class="box"><div class="box-heading"><h2>Add Person</h2><p>Create a person to start tracking payments.</p></div><div class="row"><input id="personName" placeholder="Person name"><button id="addPersonBtn" type="button">Add Person</button></div></section>
+<section class="box"><div class="box-heading"><h2>Add Transaction</h2><p>Record the amount, charges and payment details.</p></div>
+<form id="transactionForm"><div class="form-grid">
+<div><label>Person</label><select id="transactionPerson" required><option value="">Select person</option></select></div>
+<div><label>Date</label><input type="date" id="transactionDate" required></div>
+<div><label>Time</label><input type="time" id="transactionTime" required></div>
+<div><label>Type</label><select id="transactionType"><option value="debit">Debit</option><option value="credit">Credit</option><option value="other">Other</option></select></div>
+<div id="otherTypeWrap" class="conditional-field"><label>Other type</label><input id="otherType" placeholder="Enter type"></div>
+<div><label>Platform</label><select id="platform"><option>PhonePe</option><option>GPay</option><option>WhatsApp</option><option>Paytm</option><option>Amazon Pay</option><option>Bank Transfer</option><option>Cash</option><option>Other</option></select></div>
+<div id="otherPlatformWrap" class="conditional-field"><label>Other platform</label><input id="otherPlatform" placeholder="Enter platform"></div>
+<div><label>Amount</label><input type="number" id="amount" min="0" step="0.01" required placeholder="e.g. 2575"></div>
+<div><label>Amount comment</label><input id="amountComment" placeholder="Optional note"></div>
+</div>
+<div class="charge-box"><div class="charge-title"><div><strong>Charges</strong><span class="section-note">Optional</span></div><button type="button" id="addChargeBtn" class="small-btn">+ Add charge</button></div><div class="charge-head"><span>Method</span><span>Value</span><span>Included?</span><span>Comment</span><span></span></div><div id="chargesList"></div><div id="noCharges" class="no-charges">No charges added.</div><div id="chargePreview" class="charge-preview">Charges: ₹0 • Total: ₹0</div></div>
+<div class="form-grid"><div><label>Purpose</label><input id="purpose" placeholder="e.g. phonepe, shopping, general"></div><div><label>Total comment</label><input id="description" placeholder="Optional details"></div></div>
+<button type="submit" class="primary-btn">Save Transaction</button></form></section>
+<section class="box"><div class="section-header"><div><h2>People</h2><p>Manage your contacts and open individual ledgers.</p></div></div><div id="peopleList">Loading...</div></section>
+<section class="box"><div class="section-header"><div><h2>Person-wise Ledger</h2><p>Review every transaction in one place.</p></div><div class="ledger-controls"><select id="filterPerson"><option value="all">All people</option></select><button type="button" id="ledgerPdfBtn" class="secondary-btn">Export ledger PDF</button></div></div><div id="transactionsList"></div></section>
+</main>
+<div id="editModal" class="modal" aria-hidden="true"><div class="modal-card"><div class="modal-header"><div><div class="eyebrow">TRANSACTION</div><h2>Edit transaction</h2></div><button type="button" id="cancelEditBtn" class="modal-close">×</button></div><div class="modal-body"><div class="form-grid">
+<div><label>Person</label><select id="editPerson"></select></div><div><label>Date</label><input type="date" id="editDate"></div><div><label>Time</label><input type="time" id="editTime"></div><div><label>Type</label><select id="editType"><option value="debit">Debit</option><option value="credit">Credit</option><option value="other">Other</option></select></div>
+<div id="editOtherTypeWrap"><label>Other type</label><input id="editOtherType" placeholder="Enter type"></div><div><label>Platform</label><select id="editPlatform"><option>PhonePe</option><option>GPay</option><option>WhatsApp</option><option>Paytm</option><option>Amazon Pay</option><option>Bank Transfer</option><option>Cash</option><option>Other</option></select></div>
+<div id="editOtherPlatformWrap"><label>Other platform</label><input id="editOtherPlatform" placeholder="Enter platform"></div><div><label>Amount</label><input type="number" id="editAmount" min="0" step="0.01"></div><div><label>Amount comment</label><input id="editAmountComment"></div><div><label>Purpose</label><input id="editPurpose"></div><div><label>Total comment</label><input id="editDescription"></div>
+</div><div class="charge-box"><div class="charge-title"><div><strong>Charges</strong><span class="section-note">Optional</span></div><button type="button" id="addEditChargeBtn" class="small-btn">+ Add charge</button></div><div class="charge-head"><span>Method</span><span>Value</span><span>Included?</span><span>Comment</span><span></span></div><div id="editChargesList"></div><div id="editChargePreview" class="charge-preview">Charges: ₹0 • Total: ₹0</div></div></div><div class="modal-footer"><button type="button" id="cancelEditBtn2" class="secondary-btn">Cancel</button><button type="button" id="saveEditBtn" class="primary-btn">Save changes</button></div></div></div>
+<script type="module" src="app.js?v=8"></script>
+</body></html>
