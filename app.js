@@ -1,10 +1,10 @@
-import { db, ref, push, set, update, remove, onValue } from "./firebase.js";
+import { db, dbPath, ref, push, set, update, remove, onValue } from "./firebase.js";
 
 let people = {};
 let transactions = {};
 let editingTransactionId = null;
-const peopleRef = ref(db, "mypayments/people");
-const transactionsRef = ref(db, "mypayments/transactions");
+const peopleRef = ref(db, dbPath("people"));
+const transactionsRef = ref(db, dbPath("transactions"));
 
 function chargeValue(c, baseAmount) {
   const value = Number(c.value ?? c.amount) || 0;
@@ -108,9 +108,9 @@ function resetTransactionForm() { document.getElementById("transactionForm").res
 function transactionSortValue(t) { return `${t.date || "0000-00-00"}T${t.time || "00:00"}`; }
 
 window.addPerson = async function() { const input = document.getElementById("personName"), name = input.value.trim(); if (!name) return alert("Enter a name"); try { await set(push(peopleRef), { name, createdAt: Date.now() }); input.value = ""; } catch (e) { alert(`Could not add person: ${e.message}`); } };
-window.editPerson = async function(id) { const person = people[id]; if (!person) return; const name = prompt("Edit person name:", person.name || ""); if (name === null) return; const value = name.trim(); if (!value) return alert("Name cannot be empty"); try { await update(ref(db, `mypayments/people/${id}`), { name: value }); } catch (e) { alert(`Could not edit person: ${e.message}`); } };
-window.deletePerson = async function(id) { const person = people[id]; if (!person) return; const hasTransactions = Object.values(transactions).some(t => t.personId === id); const message = hasTransactions ? `Delete ${person.name} and all transactions for this person?` : `Delete ${person.name}?`; if (!confirm(message)) return; if (hasTransactions && !confirm("This will permanently delete the transaction history. Continue?")) return; const updates = {}; updates[`mypayments/people/${id}`] = null; Object.entries(transactions).forEach(([txId,t]) => { if (t.personId === id) updates[`mypayments/transactions/${txId}`] = null; }); try { await update(ref(db), updates); } catch (e) { alert(`Could not delete: ${e.message}`); } };
-window.deleteTransaction = async id => { if (!confirm("Delete this transaction permanently?")) return; try { await remove(ref(db, `mypayments/transactions/${id}`)); } catch (e) { alert(`Could not delete transaction: ${e.message}`); } };
+window.editPerson = async function(id) { const person = people[id]; if (!person) return; const name = prompt("Edit person name:", person.name || ""); if (name === null) return; const value = name.trim(); if (!value) return alert("Name cannot be empty"); try { await update(ref(db, dbPath(`people/${id}`)), { name: value }); } catch (e) { alert(`Could not edit person: ${e.message}`); } };
+window.deletePerson = async function(id) { const person = people[id]; if (!person) return; const hasTransactions = Object.values(transactions).some(t => t.personId === id); const message = hasTransactions ? `Delete ${person.name} and all transactions for this person?` : `Delete ${person.name}?`; if (!confirm(message)) return; if (hasTransactions && !confirm("This will permanently delete the transaction history. Continue?")) return; const updates = {}; updates[dbPath(`people/${id}`)] = null; Object.entries(transactions).forEach(([txId,t]) => { if (t.personId === id) updates[dbPath(`transactions/${txId}`)] = null; }); try { await update(ref(db), updates); } catch (e) { alert(`Could not delete: ${e.message}`); } };
+window.deleteTransaction = async id => { if (!confirm("Delete this transaction permanently?")) return; try { await remove(ref(db, dbPath(`transactions/${id}`))); } catch (e) { alert(`Could not delete transaction: ${e.message}`); } };
 window.editTransaction = function(id) {
   const t = transactions[id]; if (!t) return;
   editingTransactionId = id;
@@ -145,7 +145,7 @@ window.saveEditedTransaction = async function() {
   if (type === "other" && !otherType) return alert("Enter other type");
   if (platformSelect === "Other" && !otherPlatform) return alert("Enter other platform");
   try {
-    await update(ref(db, `mypayments/transactions/${editingTransactionId}`), { personId: document.getElementById("editPerson").value, date: document.getElementById("editDate").value, time: document.getElementById("editTime").value, type, otherType, amount, amountComment: document.getElementById("editAmountComment").value.trim(), charges: getEditCharges(), platform: platformSelect === "Other" ? otherPlatform : platformSelect, purpose: document.getElementById("editPurpose").value.trim(), description: document.getElementById("editDescription").value.trim() });
+    await update(ref(db, dbPath(`transactions/${editingTransactionId}`)), { personId: document.getElementById("editPerson").value, date: document.getElementById("editDate").value, time: document.getElementById("editTime").value, type, otherType, amount, amountComment: document.getElementById("editAmountComment").value.trim(), charges: getEditCharges(), platform: platformSelect === "Other" ? otherPlatform : platformSelect, purpose: document.getElementById("editPurpose").value.trim(), description: document.getElementById("editDescription").value.trim() });
     closeEditModal();
   } catch (e) { alert(`Could not save changes: ${e.message}`); }
 };
